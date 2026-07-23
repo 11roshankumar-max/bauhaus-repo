@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Taana Baana</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Work+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#12163a; --panel:#191f4c; --ivory:#f4ede0; --dim:#c9c0ab; --marigold:#e7a542; --ink:#181307; --border:rgba(244,237,224,0.14); }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--ivory); font-family:'Work Sans',sans-serif; padding:36px clamp(18px,4vw,56px) 80px; }
+  h1{ font-family:'Fraunces',serif; font-weight:600; font-size:1.8rem; margin:0 0 6px; }
+  p.sub{ color:var(--dim); margin:0 0 30px; font-family:'IBM Plex Mono',monospace; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.06em; }
+  .tabs{ display:flex; gap:20px; margin-bottom:24px; border-bottom:1px solid var(--border); }
+  .tab{ background:none; border:none; color:var(--dim); font-family:'IBM Plex Mono',monospace; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em;
+    padding:0 0 12px; cursor:pointer; border-bottom:2px solid transparent; }
+  .tab.active{ color:var(--ivory); border-color:var(--marigold); }
+  table{ width:100%; border-collapse:collapse; font-size:0.88rem; }
+  th, td{ text-align:left; padding:12px 14px; border-bottom:1px solid var(--border); }
+  th{ font-family:'IBM Plex Mono',monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--dim); }
+  tr:hover td{ background:rgba(244,237,224,0.03); }
+  .status{ display:inline-block; padding:3px 10px; border-radius:10px; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.04em; }
+  .status.pending{ background:rgba(231,165,66,0.18); color:#e7a542; }
+  .status.paid{ background:rgba(47,111,94,0.25); color:#5fd6b3; }
+  .status.packed, .status.shipped{ background:rgba(91,103,176,0.25); color:#a9b1e8; }
+  .status.delivered{ background:rgba(47,111,94,0.35); color:#8ff0cd; }
+  .status.cancelled, .status.failed{ background:rgba(178,58,58,0.25); color:#ff9a9a; }
+  select{ background:var(--bg); color:var(--ivory); border:1px solid var(--border); padding:5px 8px; border-radius:2px; font-family:inherit; font-size:0.8rem; }
+  .low-stock{ color:#ff9a9a; }
+  .empty{ color:var(--dim); padding:30px 0; }
+</style>
+</head>
+<body>
+  <h1>Taana Baana — Admin</h1>
+  <p class="sub" id="summary">Loading…</p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="orders">Orders</button>
+    <button class="tab" data-tab="stock">Stock</button>
+  </div>
+
+  <div id="orders-panel">
+    <table>
+      <thead><tr><th>#</th><th>Status</th><th>Customer</th><th>Total</th><th>Provider</th><th>Placed</th><th></th></tr></thead>
+      <tbody id="orders-body"></tbody>
+    </table>
+  </div>
+
+  <div id="stock-panel" style="display:none">
+    <table>
+      <thead><tr><th>SKU</th><th>State</th><th>Title</th><th>Category</th><th>Price</th><th>Stock</th></tr></thead>
+      <tbody id="stock-body"></tbody>
+    </table>
+  </div>
+
+<script>
+const money = (c)=> '$' + (c/100).toFixed(2);
+const STATUSES = ['pending','paid','packed','shipped','delivered','cancelled'];
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('orders-panel').style.display = t.dataset.tab==='orders' ? '' : 'none';
+    document.getElementById('stock-panel').style.display = t.dataset.tab==='stock' ? '' : 'none';
+  });
+});
+
+async function loadOrders(){
+  const r = await fetch('/api/admin/orders');
+  const orders = await r.json();
+  document.getElementById('summary').textContent = orders.length + ' orders · ' +
+    orders.filter(o=>o.status==='paid').length + ' paid · $' +
+    (orders.filter(o=>o.status!=='cancelled').reduce((s,o)=>s+o.total_cents,0)/100).toFixed(2) + ' total';
+
+  const body = document.getElementById('orders-body');
+  if(orders.length === 0){
+    body.innerHTML = '<tr><td colspan="7" class="empty">No orders yet — place a test order from the storefront.</td></tr>';
+    return;
+  }
+  body.innerHTML = orders.map(o => `
+    <tr>
+      <td>#${o.id}</td>
+      <td><span class="status ${o.status}">${o.status}</span></td>
+      <td>${o.customer_name || ''}<br><span style="color:var(--dim);font-size:0.8em">${o.customer_email || ''}</span></td>
+      <td>${money(o.total_cents)}</td>
+      <td>${o.payment_provider}</td>
+      <td>${o.created_at}</td>
+      <td>
+        <select data-order-id="${o.id}">
+          ${STATUSES.map(s => `<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+    </tr>
+  `).join('');
+
+  body.querySelectorAll('select').forEach(sel=>{
+    sel.addEventListener('change', async ()=>{
+      await fetch('/api/admin/orders/' + sel.dataset.orderId + '/status', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ status: sel.value })
+      });
+      loadOrders();
+    });
+  });
+}
+
+async function loadStock(){
+  const r = await fetch('/api/admin/products');
+  const products = await r.json();
+  document.getElementById('stock-body').innerHTML = products.map(p => `
+    <tr>
+      <td>${p.sku}</td>
+      <td>${p.state_name}</td>
+      <td>${p.title}</td>
+      <td>${p.category}</td>
+      <td>${money(p.price_cents)}</td>
+      <td class="${p.stock < 10 ? 'low-stock' : ''}">${p.stock}</td>
+    </tr>
+  `).join('');
+}
+
+loadOrders();
+loadStock();
+setInterval(loadOrders, 8000);
+</script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order confirmed — Taana Baana</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Work+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#12163a; --panel:#191f4c; --ivory:#f4ede0; --dim:#c9c0ab; --marigold:#e7a542; --ink:#181307; }
+  *{box-sizing:border-box;}
+  body{ margin:0; min-height:100vh; background:var(--bg); color:var(--ivory); font-family:'Work Sans',sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:24px; }
+  .card{ max-width:560px; width:100%; background:var(--panel); border:1px solid rgba(244,237,224,0.14); border-radius:4px; padding:44px; }
+  .mark{ width:44px; height:44px; border-radius:50%; background:var(--marigold); display:flex; align-items:center; justify-content:center; margin-bottom:22px; }
+  h1{ font-family:'Fraunces',serif; font-weight:600; font-size:1.8rem; margin:0 0 8px; }
+  p.sub{ color:var(--dim); margin:0 0 28px; font-size:0.95rem; }
+  .row{ display:flex; justify-content:space-between; padding:12px 0; border-top:1px solid rgba(244,237,224,0.12); font-size:0.92rem; }
+  .row.total{ font-family:'Fraunces',serif; font-weight:600; font-size:1.2rem; border-top:1px solid rgba(244,237,224,0.25); margin-top:6px; }
+  .mono{ font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--dim); text-transform:uppercase; letter-spacing:0.06em; }
+  a.btn{ display:inline-block; margin-top:28px; font-family:'IBM Plex Mono',monospace; font-size:0.75rem; letter-spacing:0.06em; text-transform:uppercase;
+    padding:12px 22px; border:1px solid var(--marigold); color:var(--ivory); text-decoration:none; border-radius:2px; }
+  a.btn:hover{ background:var(--marigold); color:var(--ink); }
+  #loading, #error{ color:var(--dim); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="mark">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#181307" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div id="loading">Confirming your order…</div>
+    <div id="error" style="display:none"></div>
+    <div id="content" style="display:none">
+      <h1>Order confirmed</h1>
+      <p class="sub" id="sub-line"></p>
+      <div id="items"></div>
+      <div class="row total"><span>Total</span><strong id="total"></strong></div>
+      <p class="mono" id="order-meta" style="margin-top:18px;"></p>
+    </div>
+    <a class="btn" href="/">&larr; Back to the map</a>
+  </div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const orderId = params.get('order');
+const sessionId = params.get('session_id');
+const money = (c)=> '$' + (c/100).toFixed(2);
+
+async function load(){
+  if(!orderId){
+    document.getElementById('loading').style.display='none';
+    document.getElementById('error').style.display='block';
+    document.getElementById('error').textContent = 'No order reference found in the URL.';
+    return;
+  }
+  try{
+    const url = '/api/checkout/order/' + orderId + (sessionId ? ('?session_id=' + encodeURIComponent(sessionId)) : '');
+    const r = await fetch(url);
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error || 'Could not load order');
+
+    document.getElementById('loading').style.display='none';
+    document.getElementById('content').style.display='block';
+    document.getElementById('sub-line').textContent =
+      data.order.status === 'paid'
+        ? 'Thank you — a confirmation has been sent to ' + data.order.customer_email + '.'
+        : 'Your order is recorded as "' + data.order.status + '". If you just paid, this page will refresh shortly.';
+    document.getElementById('items').innerHTML = data.items.map(i =>
+      '<div class="row"><span>' + i.quantity + ' &times; ' + i.title + '</span><span>' + money(i.unit_price_cents * i.quantity) + '</span></div>'
+    ).join('');
+    document.getElementById('total').textContent = money(data.order.total_cents);
+    document.getElementById('order-meta').textContent = 'Order #' + data.order.id + ' · ' + data.order.payment_provider + ' · ' + data.order.status;
+
+    if(data.order.status !== 'paid'){
+      setTimeout(load, 2000);
+    }
+  }catch(err){
+    document.getElementById('loading').style.display='none';
+    document.getElementById('error').style.display='block';
+    document.getElementById('error').textContent = err.message;
+  }
+}
+load();
+</script>
+</body>
+</html>

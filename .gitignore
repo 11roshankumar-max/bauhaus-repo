@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.local
+data/store.db
+data/store.db-*
+*.log
+
+# engine/ subproject
+engine/node_modules/
+engine/.env
+engine/data/engine.db
+engine/data/engine.db-*
+
+# local-only Claude Code tooling config, not shared
+.claude/settings.local.json
