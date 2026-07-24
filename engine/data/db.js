@@ -179,6 +179,14 @@ function migrate() {
     db.exec('ALTER TABLE opportunities ADD COLUMN rec_timing TEXT');
     db.exec('ALTER TABLE opportunities ADD COLUMN rec_pitch TEXT');
   }
+
+  // Registered office address, pulled from the promoter's own RERA
+  // registration certificate (a legally-mandated public disclosure) — not a
+  // phone/email, but real and verifiable, unlike everything else we tried.
+  const companyCols = db.prepare("PRAGMA table_info(companies)").all().map((c) => c.name);
+  if (!companyCols.includes('address')) {
+    db.exec('ALTER TABLE companies ADD COLUMN address TEXT');
+  }
 }
 
 function seed() {

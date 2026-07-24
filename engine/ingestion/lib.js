@@ -25,6 +25,18 @@ function getOrCreateCompany(name, extra = {}) {
   return result.lastInsertRowid;
 }
 
+// Returns true if this company still needs an address looked up — lets a
+// connector skip the extra fetch for companies it's already resolved.
+function companyNeedsAddress(companyId) {
+  const row = db.prepare('SELECT address FROM companies WHERE id = ?').get(companyId);
+  return !!row && !row.address;
+}
+
+function setCompanyAddress(companyId, address) {
+  if (!companyId || !address) return;
+  db.prepare('UPDATE companies SET address = ? WHERE id = ? AND address IS NULL').run(address, companyId);
+}
+
 // source_ref (e.g. "rera:PRM/KA/...") makes this idempotent per raw event.
 // Unlike a plain "insert if new", a re-run that finds the opportunity already
 // exists but has since moved to a new stage (e.g. RERA "approved" ->
@@ -82,4 +94,7 @@ function markSourceChecked(url) {
   db.prepare("UPDATE sources SET last_checked = datetime('now') WHERE url = ?").run(url);
 }
 
-module.exports = { storeRawEvent, getOrCreateCompany, upsertOpportunity, recordSignal, markSourceChecked };
+module.exports = {
+  storeRawEvent, getOrCreateCompany, upsertOpportunity, recordSignal, markSourceChecked,
+  companyNeedsAddress, setCompanyAddress,
+};

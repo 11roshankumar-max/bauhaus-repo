@@ -1,5 +1,6 @@
 const cheerio = require('cheerio');
-const { storeRawEvent, getOrCreateCompany, upsertOpportunity, recordSignal, markSourceChecked } = require('./lib.js');
+const { storeRawEvent, getOrCreateCompany, upsertOpportunity, recordSignal, markSourceChecked, companyNeedsAddress, setCompanyAddress } = require('./lib.js');
+const { fetchRegisteredAddress } = require('./reraCertificate.js');
 
 const SOURCE_KEY = 'rera';
 const SEARCH_URL = 'https://rera.karnataka.gov.in/projectViewDetails';
@@ -74,7 +75,7 @@ function parseRows(html) {
 }
 
 async function run() {
-  const summary = { fetched: 0, stored: 0, opportunities: 0, districts: DISTRICTS };
+  const summary = { fetched: 0, stored: 0, opportunities: 0, addresses: 0, districts: DISTRICTS };
   for (const district of DISTRICTS) {
     const html = await fetchDistrict(district);
     const rows = parseRows(html);
@@ -109,6 +110,21 @@ async function run() {
       const signalType = SIGNAL_BY_STAGE[stage];
       if (signalType) {
         recordSignal(opportunityId, signalType, { source: 'rera', evidence: row.project_name, confidence: 0.75 });
+      }
+
+      // Only registered (reg_no-bearing) projects have a certificate to pull
+      // from, and only companies we haven't already resolved an address for
+      // — this is one extra fetch per company, not per project.
+      if (row.reg_no && companyId && companyNeedsAddress(companyId)) {
+        try {
+          const address = await fetchRegisteredAddress(row.reg_no, row.promoter_name);
+          if (address) {
+            setCompanyAddress(companyId, address);
+            summary.addresses += 1;
+          }
+        } catch {
+          // certificate fetch/parse failing shouldn't break the ingestion run
+        }
       }
     }
   }

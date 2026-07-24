@@ -16,14 +16,24 @@ by `ingestion/run.js` and triggerable from the dashboard's Raw Events tab
 - **opportunities** — full CRUD, `status` drives the CRM funnel
   (`new → contacted → meeting → proposal → won/lost`)
 - **companies** / **contacts** — linked to opportunities via `company_id` so
-  a lead always resolves to someone to call. **Contacts are entered by a
-  human, not auto-discovered**: neither RERA nor GeM publish named-person
-  contact info in the data we pull (verified — RERA's project detail view
-  has zero email/phone/contact fields; only 1 of 31 GeM tenders had a real
-  email rather than a portal login handle), and automatically scraping
-  LinkedIn/people-search sites for names isn't something this build does.
-  The Contacts tab exists so your team can record who they found once
-  they've actually looked someone up.
+  a lead always resolves to someone to call.
+  - **Registered address is auto-populated for RERA companies**
+    (`ingestion/reraCertificate.js`): every registered project has a Form-C
+    certificate PDF at a predictable URL, which is a legally-mandated public
+    disclosure of the promoter's registered office — not scraped personal
+    data. Fetched once per company (skipped if already set), parsed with
+    `pdf-parse`. In practice this filled in **85 of 132 companies** with a
+    real, verifiable postal address (e.g. Chalet Hotels Limited's actual
+    registered office).
+  - **Named-person contacts (a phone number, an email, a name) are not
+    auto-discovered** — checked directly: RERA's project detail view and
+    certificate both lack any phone/email field, and only 1 of 31 GeM
+    tenders carried a real email rather than a portal login handle.
+    Automatically scraping LinkedIn/people-search sites for names is
+    something this build deliberately does not do. The Contacts tab is where
+    your team records a name/email/phone once they've actually looked
+    someone up — not auto-filled, but no longer just an empty form either,
+    since the company record it attaches to now usually has a real address.
 - **industry_profiles** — config-driven scoring targets (seeded with a
   "Premium Furniture" profile) instead of hardcoded if/else rules
 - Whole app is gated by HTTP Basic Auth (`ENGINE_USER`/`ENGINE_PASSWORD`)
@@ -114,6 +124,10 @@ the tender closes on 2026-07-23").
 - **Recommendation rules only know six stages** — anything with a `null`
   stage (a real chunk of news-derived opportunities, see above) falls to a
   generic "needs manual review" recommendation rather than a specific one.
+- **Registered address only covers RERA-sourced companies** — the 47 of 132
+  companies without one are GeM government departments (no certificate
+  exists) or news-derived hotel brands (not RERA promoters at all). It's a
+  postal address, not a phone/email either way.
 
 ## Running it
 
