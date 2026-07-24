@@ -16,7 +16,14 @@ by `ingestion/run.js` and triggerable from the dashboard's Raw Events tab
 - **opportunities** — full CRUD, `status` drives the CRM funnel
   (`new → contacted → meeting → proposal → won/lost`)
 - **companies** / **contacts** — linked to opportunities via `company_id` so
-  a lead always resolves to someone to call
+  a lead always resolves to someone to call. **Contacts are entered by a
+  human, not auto-discovered**: neither RERA nor GeM publish named-person
+  contact info in the data we pull (verified — RERA's project detail view
+  has zero email/phone/contact fields; only 1 of 31 GeM tenders had a real
+  email rather than a portal login handle), and automatically scraping
+  LinkedIn/people-search sites for names isn't something this build does.
+  The Contacts tab exists so your team can record who they found once
+  they've actually looked someone up.
 - **industry_profiles** — config-driven scoring targets (seeded with a
   "Premium Furniture" profile) instead of hardcoded if/else rules
 - Whole app is gated by HTTP Basic Auth (`ENGINE_USER`/`ENGINE_PASSWORD`)

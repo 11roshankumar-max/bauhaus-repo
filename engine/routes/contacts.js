@@ -6,10 +6,22 @@ const router = express.Router();
 // GET /api/contacts?company_id=
 router.get('/contacts', (req, res) => {
   const { company_id } = req.query;
+  const base = `
+    SELECT c.*, co.name AS company_name
+    FROM contacts c
+    JOIN companies co ON co.id = c.company_id
+  `;
   if (company_id) {
-    return res.json(db.prepare('SELECT * FROM contacts WHERE company_id = ? ORDER BY name ASC').all(company_id));
+    return res.json(db.prepare(`${base} WHERE c.company_id = ? ORDER BY c.name ASC`).all(company_id));
   }
-  res.json(db.prepare('SELECT * FROM contacts ORDER BY name ASC').all());
+  res.json(db.prepare(`${base} ORDER BY c.name ASC`).all());
+});
+
+// DELETE /api/contacts/:id
+router.delete('/contacts/:id', (req, res) => {
+  const result = db.prepare('DELETE FROM contacts WHERE id = ?').run(req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'Contact not found' });
+  res.json({ ok: true });
 });
 
 // POST /api/contacts
